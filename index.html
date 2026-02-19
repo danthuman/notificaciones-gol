@@ -49,6 +49,15 @@
             opacity: 0.9;
         }
 
+        .user-info {
+            background-color: #f0f0f0;
+            padding: 8px 20px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            word-break: break-all;
+        }
+
         .countries-list {
             padding: 8px 20px;
             flex: 1;
@@ -68,7 +77,7 @@
             color: #000;
         }
 
-        /* iOS Toggle Switch - con color naranja #ff5900 */
+        /* iOS Toggle Switch - color naranja */
         .ios-toggle {
             position: relative;
             display: inline-block;
@@ -107,7 +116,6 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
-        /* Color naranja cuando está activado */
         input:checked + .toggle-slider {
             background-color: #ff5900;
         }
@@ -116,7 +124,6 @@
             transform: translateX(20px);
         }
 
-        /* Footer con botón guardar */
         .footer {
             padding: 20px;
             border-top: 1px solid #e0e0e0;
@@ -126,7 +133,7 @@
         .save-button {
             width: 100%;
             padding: 16px;
-            background-color: #ff5900;
+            background-color: #1a5f1a;
             color: white;
             border: none;
             border-radius: 12px;
@@ -144,23 +151,35 @@
             box-shadow: 0 2px 4px rgba(26, 95, 26, 0.25);
         }
 
-        /* Mensaje de éxito */
-        .success-message {
+        .save-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
             text-align: center;
             padding: 10px;
-            background-color: #ff5900;
-            color: white;
             border-radius: 8px;
             margin-bottom: 15px;
             font-size: 14px;
             display: none;
         }
 
-        .success-message.show {
+        .message.success {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .message.error {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .message.show {
             display: block;
         }
 
-        /* Touch improvements */
         @media (hover: none) and (pointer: coarse) {
             .country-item {
                 padding: 16px 0;
@@ -179,14 +198,14 @@
             <h2>Selecciona tus equipos</h2>
         </div>
         
-        <div class="countries-list" id="countriesList">
-            <!-- Los países se agregarán aquí dinámicamente con JavaScript -->
+        <div class="user-info" id="userInfo">
+            Cargando información de usuario...
         </div>
+        
+        <div class="countries-list" id="countriesList"></div>
 
         <div class="footer">
-            <div class="success-message" id="successMessage">
-                ✅ Preferencias guardadas correctamente
-            </div>
+            <div class="message" id="message"></div>
             <button class="save-button" id="saveButton">
                 Guardar preferencias
             </button>
@@ -194,46 +213,102 @@
     </div>
 
     <script>
+        // Configuración
+        const BACKEND_URL = 'https://notificaciones-gol-api.onrender.com';
+        
+        // Lista de países
         const countries = [
-            "México",
-            "Estados Unidos", 
-            "Canadá",
-            "Argentina",
-            "Brasil",
-            "Francia",
-            "Colombia",
-            "Inglaterra",
-            "Países Bajos",
-            "Suecia"
+            { display: "México", value: "mexico" },
+            { display: "Estados Unidos", value: "united-states" },
+            { display: "Canadá", value: "canada" },
+            { display: "Argentina", value: "argentina" },
+            { display: "Brasil", value: "brazil" },
+            { display: "Francia", value: "france" },
+            { display: "Colombia", value: "colombia" },
+            { display: "Inglaterra", value: "england" },
+            { display: "Países Bajos", value: "netherlands" },
+            { display: "Suecia", value: "sweden" }
         ];
 
-        // Cargar estado guardado o inicializar nuevo
-        let activeStates = JSON.parse(localStorage.getItem('activeCountries')) || {};
+        // Estado de la aplicación
+        let activeStates = {};
+        let userId = null;
 
+        // Inicialización
+        function init() {
+            extractUserIdFromUrl();
+            if (userId) {
+                loadUserPreferences();
+            }
+            renderCountries();
+        }
+
+        // Extraer userId de la URL (formato: /userid-a6d15c60-7a0a-4e59-9cec-38f6be77649b)
+        function extractUserIdFromUrl() {
+            const path = window.location.pathname;
+            const match = path.match(/userid-([a-f0-9-]+)/i);
+            
+            if (match) {
+                userId = match[1];
+                document.getElementById('userInfo').textContent = `Usuario: ${userId}`;
+                console.log('✅ userId extraído:', userId);
+            } else {
+                userId = null;
+                document.getElementById('userInfo').textContent = '❌ Error: No se encontró userId en la URL';
+                document.getElementById('userInfo').style.backgroundColor = '#ffebee';
+            }
+        }
+
+        // Cargar preferencias del usuario desde Braze (a través del backend)
+        async function loadUserPreferences() {
+            try {
+                // Nota: Este endpoint aún no existe en el backend
+                // Por ahora usamos localStorage como fallback
+                const saved = localStorage.getItem(`preferences_${userId}`);
+                if (saved) {
+                    activeStates = JSON.parse(saved);
+                    console.log('📦 Preferencias cargadas de localStorage:', activeStates);
+                } else {
+                    // Inicializar todas como false
+                    countries.forEach(c => {
+                        activeStates[c.display] = false;
+                    });
+                }
+            } catch (error) {
+                console.error('Error cargando preferencias:', error);
+                // Inicializar todas como false
+                countries.forEach(c => {
+                    activeStates[c.display] = false;
+                });
+            }
+            
+            // Actualizar UI
+            updateToggleStates();
+        }
+
+        // Renderizar lista de países
         function renderCountries() {
             const listElement = document.getElementById('countriesList');
             listElement.innerHTML = '';
 
             countries.forEach(country => {
-                const isActive = activeStates[country] || false;
+                const isActive = activeStates[country.display] || false;
                 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'country-item';
 
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'country-name';
-                nameSpan.textContent = country;
+                nameSpan.textContent = country.display;
 
-                // iOS Style Toggle
+                // Toggle switch
                 const toggleLabel = document.createElement('label');
                 toggleLabel.className = 'ios-toggle';
                 
                 const toggleInput = document.createElement('input');
                 toggleInput.type = 'checkbox';
                 toggleInput.checked = isActive;
-                
-                // Guardar referencia al país en el input
-                toggleInput.dataset.country = country;
+                toggleInput.dataset.country = country.display;
                 
                 const sliderSpan = document.createElement('span');
                 sliderSpan.className = 'toggle-slider';
@@ -241,10 +316,10 @@
                 toggleLabel.appendChild(toggleInput);
                 toggleLabel.appendChild(sliderSpan);
 
-                // Event listener para cambios individuales
+                // Event listener
                 toggleInput.addEventListener('change', function(e) {
-                    // Actualizamos el estado pero no guardamos aún
                     activeStates[this.dataset.country] = this.checked;
+                    console.log('🔄 Cambio:', this.dataset.country, this.checked);
                 });
 
                 itemDiv.appendChild(nameSpan);
@@ -253,49 +328,99 @@
             });
         }
 
-        // Función para guardar preferencias
-        function savePreferences() {
-            // Guardar en localStorage
-            localStorage.setItem('activeCountries', JSON.stringify(activeStates));
-            
-            // Mostrar mensaje de éxito
-            const successMsg = document.getElementById('successMessage');
-            successMsg.classList.add('show');
-            
-            // Ocultar mensaje después de 2 segundos
-            setTimeout(() => {
-                successMsg.classList.remove('show');
-            }, 2000);
-            
-            // Feedback háptico (vibración) si el dispositivo lo soporta
-            if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(50);
-            }
-            
-            console.log('Preferencias guardadas:', activeStates);
+        // Actualizar estados de los toggles
+        function updateToggleStates() {
+            document.querySelectorAll('.ios-toggle input').forEach(input => {
+                const country = input.dataset.country;
+                input.checked = activeStates[country] || false;
+            });
         }
 
-        // Inicializar la lista
-        renderCountries();
+        // Guardar preferencias
+        async function savePreferences() {
+            const saveButton = document.getElementById('saveButton');
+            const messageEl = document.getElementById('message');
+            
+            // Validar userId
+            if (!userId) {
+                showMessage('error', 'No hay userId en la URL');
+                return;
+            }
+            
+            // Deshabilitar botón
+            saveButton.disabled = true;
+            saveButton.textContent = 'Guardando...';
+            
+            try {
+                // Obtener equipos seleccionados
+                const selectedTeams = Object.entries(activeStates)
+                    .filter(([_, isActive]) => isActive)
+                    .map(([display]) => {
+                        const country = countries.find(c => c.display === display);
+                        return country ? country.value : null;
+                    })
+                    .filter(v => v !== null);
+                
+                console.log('📤 Enviando al backend:', {
+                    userId,
+                    teams: selectedTeams.length > 0 ? selectedTeams : null
+                });
 
-        // Event listener para botón guardar
+                // Construir payload: null si no hay selecciones, array si hay
+                const payload = {
+                    teams: selectedTeams.length > 0 ? selectedTeams : null
+                };
+
+                // Llamar al backend
+                const response = await fetch(`${BACKEND_URL}/api/save-preferences/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Guardar también en localStorage como respaldo
+                    localStorage.setItem(`preferences_${userId}`, JSON.stringify(activeStates));
+                    
+                    showMessage('success', 
+                        selectedTeams.length === 0 
+                            ? '✅ Preferencias eliminadas correctamente' 
+                            : `✅ Guardados ${selectedTeams.length} equipos`
+                    );
+                    
+                    console.log('✅ Respuesta del backend:', data);
+                } else {
+                    throw new Error(data.error || 'Error al guardar');
+                }
+
+            } catch (error) {
+                console.error('❌ Error:', error);
+                showMessage('error', 'Error al guardar: ' + error.message);
+            } finally {
+                // Restaurar botón
+                saveButton.disabled = false;
+                saveButton.textContent = 'Guardar preferencias';
+            }
+        }
+
+        // Mostrar mensaje
+        function showMessage(type, text) {
+            const messageEl = document.getElementById('message');
+            messageEl.className = `message ${type} show`;
+            messageEl.textContent = text;
+            
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+            }, 3000);
+        }
+
+        // Event listeners
         document.getElementById('saveButton').addEventListener('click', savePreferences);
 
-        // Opcional: Guardar con gesto de deslizar hacia abajo (pull to save)
-        let touchStartY = 0;
-        document.addEventListener('touchstart', function(e) {
-            touchStartY = e.touches[0].clientY;
-        }, { passive: true });
-
-        document.addEventListener('touchend', function(e) {
-            const touchEndY = e.changedTouches[0].clientY;
-            const scrollTop = document.documentElement.scrollTop;
-            
-            // Si está en la parte superior y desliza hacia abajo
-            if (scrollTop === 0 && touchEndY > touchStartY + 100) {
-                savePreferences();
-            }
-        });
+        // Inicializar la app
+        init();
     </script>
 </body>
 </html>
