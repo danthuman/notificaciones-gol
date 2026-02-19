@@ -243,27 +243,25 @@
             renderCountries();
         }
 
-        // Extraer userId de la URL (formato: /userid-a6d15c60-7a0a-4e59-9cec-38f6be77649b)
+        // Extraer userId de los query parameters (?user_id=123)
         function extractUserIdFromUrl() {
-            const path = window.location.pathname;
-            const match = path.match(/userid-([a-f0-9-]+)/i);
+            const urlParams = new URLSearchParams(window.location.search);
+            userId = urlParams.get('user_id');
             
-            if (match) {
-                userId = match[1];
+            if (userId) {
                 document.getElementById('userInfo').textContent = `Usuario: ${userId}`;
-                console.log('✅ userId extraído:', userId);
+                document.getElementById('userInfo').style.backgroundColor = '#f0f0f0';
+                console.log('✅ userId extraído de query param:', userId);
             } else {
                 userId = null;
-                document.getElementById('userInfo').textContent = '❌ Error: No se encontró userId en la URL';
+                document.getElementById('userInfo').textContent = '❌ Error: No se encontró user_id en la URL (ej: ?user_id=tu-id)';
                 document.getElementById('userInfo').style.backgroundColor = '#ffebee';
             }
         }
 
-        // Cargar preferencias del usuario desde Braze (a través del backend)
+        // Cargar preferencias del usuario desde localStorage
         async function loadUserPreferences() {
             try {
-                // Nota: Este endpoint aún no existe en el backend
-                // Por ahora usamos localStorage como fallback
                 const saved = localStorage.getItem(`preferences_${userId}`);
                 if (saved) {
                     activeStates = JSON.parse(saved);
@@ -276,13 +274,11 @@
                 }
             } catch (error) {
                 console.error('Error cargando preferencias:', error);
-                // Inicializar todas como false
                 countries.forEach(c => {
                     activeStates[c.display] = false;
                 });
             }
             
-            // Actualizar UI
             updateToggleStates();
         }
 
@@ -341,18 +337,15 @@
             const saveButton = document.getElementById('saveButton');
             const messageEl = document.getElementById('message');
             
-            // Validar userId
             if (!userId) {
-                showMessage('error', 'No hay userId en la URL');
+                showMessage('error', 'No hay user_id en la URL (usa ?user_id=tu-id)');
                 return;
             }
             
-            // Deshabilitar botón
             saveButton.disabled = true;
             saveButton.textContent = 'Guardando...';
             
             try {
-                // Obtener equipos seleccionados
                 const selectedTeams = Object.entries(activeStates)
                     .filter(([_, isActive]) => isActive)
                     .map(([display]) => {
@@ -366,12 +359,10 @@
                     teams: selectedTeams.length > 0 ? selectedTeams : null
                 });
 
-                // Construir payload: null si no hay selecciones, array si hay
                 const payload = {
                     teams: selectedTeams.length > 0 ? selectedTeams : null
                 };
 
-                // Llamar al backend
                 const response = await fetch(`${BACKEND_URL}/api/save-preferences/${userId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -381,7 +372,6 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    // Guardar también en localStorage como respaldo
                     localStorage.setItem(`preferences_${userId}`, JSON.stringify(activeStates));
                     
                     showMessage('success', 
@@ -399,7 +389,6 @@
                 console.error('❌ Error:', error);
                 showMessage('error', 'Error al guardar: ' + error.message);
             } finally {
-                // Restaurar botón
                 saveButton.disabled = false;
                 saveButton.textContent = 'Guardar preferencias';
             }
